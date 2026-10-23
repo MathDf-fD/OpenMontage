@@ -123,6 +123,11 @@ export function resolveTheme(props: Record<string, unknown>): ThemeConfig {
 const calculateMetadata: CalculateMetadataFunction<ExplainerProps> = async ({
   props,
 }) => {
+  // An explicit total length wins, so callers can end exactly on their last frame (no padding)
+  const explicit = Number((props as Record<string, unknown>).durationSeconds);
+  if (Number.isFinite(explicit) && explicit > 0) {
+    return { durationInFrames: Math.ceil(explicit * 30) };
+  }
   const cuts = props.cuts || [];
   if (cuts.length === 0) {
     return { durationInFrames: 30 * 60 };

@@ -240,6 +240,7 @@ interface Cut {
   fontSize?: number;
   // Animation & transitions
   animation?: string;
+  zoom?: [number, number]; // still images: scale from → to over the cut (overrides the animation preset amount)
   transition_in?: string;
   transition_out?: string;
   transition_duration?: number;
@@ -342,22 +343,37 @@ const Vignette: React.FC = () => (
 // Enhanced Image Scene — spring physics, parallax, variety
 // ---------------------------------------------------------------------------
 
-const ImageScene: React.FC<{ src: string; animation?: string }> = ({
+const ImageScene: React.FC<{
+  src: string;
+  animation?: string;
+  zoom?: [number, number];
+  transitionIn?: string;
+  transitionOut?: string;
+}> = ({
   src,
   animation,
+  zoom,
+  transitionIn,
+  transitionOut,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
 
+  // "cut" / "none" skip the fades, as in VideoScene (hard cuts between stills)
+  const hardIn = ["cut", "none"].includes((transitionIn || "").toLowerCase());
+  const hardOut = ["cut", "none"].includes((transitionOut || "").toLowerCase());
+
   // Smooth spring fade-in
-  const fadeIn = spring({ frame, fps, config: { damping: 18, stiffness: 80 } });
+  const fadeIn = hardIn ? 1 : spring({ frame, fps, config: { damping: 18, stiffness: 80 } });
 
   // Fade-out for crossfade effect
   const fadeOutStart = durationInFrames - 8;
-  const fadeOut = interpolate(frame, [fadeOutStart, durationInFrames], [1, 0.3], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  const fadeOut = hardOut
+    ? 1
+    : interpolate(frame, [fadeOutStart, durationInFrames], [1, 0.3], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
 
   let scale = 1;
   let translateX = 0;
@@ -391,6 +407,13 @@ const ImageScene: React.FC<{ src: string; animation?: string }> = ({
     scale = 1.1;
   }
   // "static" or "none" → just display
+
+  // Explicit [from, to] scale range overrides the preset amount (e.g. a gentle 1 → 1.08)
+  if (zoom && zoom.length === 2) {
+    scale = interpolate(progress, [0, 1], zoom);
+    translateX = 0;
+    translateY = 0;
+  }
 
   return (
     <AbsoluteFill style={{ overflow: "hidden", background: "#0F172A" }}>
@@ -745,7 +768,7 @@ const SceneRenderer: React.FC<{ cut: Cut; theme: ThemeConfig }> = ({ cut, theme 
   const animation = cut.animation || cut.transform?.animation;
 
   if (cut.source && isImage(cut.source)) {
-    return maybeWrapWithBg(<ImageScene src={cut.source} animation={animation} />);
+    return maybeWrapWithBg(<ImageScene src={cut.source} animation={animation} zoom={cut.zoom} transitionIn={cut.transition_in} transitionOut={cut.transition_out} />);
   }
 
   if (cut.source && isVideo(cut.source)) {
@@ -764,7 +787,7 @@ const SceneRenderer: React.FC<{ cut: Cut; theme: ThemeConfig }> = ({ cut, theme 
 
   // Final fallback — try as image if source exists, otherwise show text_card
   if (cut.source) {
-    return maybeWrapWithBg(<ImageScene src={cut.source} animation={animation} />);
+    return maybeWrapWithBg(<ImageScene src={cut.source} animation={animation} zoom={cut.zoom} transitionIn={cut.transition_in} transitionOut={cut.transition_out} />);
   }
 
   // No source, no type — render as text card with cut id as fallback
