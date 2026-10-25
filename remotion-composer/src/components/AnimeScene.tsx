@@ -52,6 +52,9 @@ export interface AnimeSceneProps {
    * length so crossfade/camera/lighting calculations use the correct range.
    */
   sceneDurationSeconds?: number;
+  /** "cut" / "none" → no scene fade in or out (hard cuts between stills, as in ImageScene) */
+  transitionIn?: string;
+  transitionOut?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -142,9 +145,13 @@ export const AnimeScene: React.FC<AnimeSceneProps> = ({
   lightingFrom,
   lightingTo,
   sceneDurationSeconds,
+  transitionIn,
+  transitionOut,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
+  const hardIn = ["cut", "none"].includes((transitionIn || "").toLowerCase());
+  const hardOut = ["cut", "none"].includes((transitionOut || "").toLowerCase());
 
   // CRITICAL FIX: useVideoConfig().durationInFrames returns the FULL
   // composition duration (e.g. 930 for a 31s video), NOT the Sequence
@@ -174,17 +181,21 @@ export const AnimeScene: React.FC<AnimeSceneProps> = ({
    */
   const getOpacity = (idx: number): number => {
     // Scene-level fade-in (first 0.5s) and fade-out (last 0.3s)
-    const sceneIn = spring({
-      frame,
-      fps,
-      config: { damping: 18, stiffness: 80 },
-    });
-    const sceneOut = interpolate(
-      frame,
-      [effectiveDuration - 10, effectiveDuration],
-      [1, 0.25],
-      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-    );
+    const sceneIn = hardIn
+      ? 1
+      : spring({
+          frame,
+          fps,
+          config: { damping: 18, stiffness: 80 },
+        });
+    const sceneOut = hardOut
+      ? 1
+      : interpolate(
+          frame,
+          [effectiveDuration - 10, effectiveDuration],
+          [1, 0.25],
+          { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+        );
 
     if (imageCount <= 1) {
       return sceneIn * sceneOut;

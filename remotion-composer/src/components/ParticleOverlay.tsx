@@ -161,73 +161,56 @@ const Sparkles: React.FC<{
   intensity: number;
 }> = ({ count, color, intensity }) => {
   const frame = useCurrentFrame();
-  const { fps, durationInFrames } = useVideoConfig();
+  const { fps, durationInFrames, width, height } = useVideoConfig();
 
+  // jarvis branch (25/10/2026): drawn in SVG (bars + small radial glow) instead of DOM bars with box-shadow glows —
+  // same look, but box-shadows cost about 3 s per frame without a GPU (measured on an Apple M2)
   return (
     <AbsoluteFill style={{ pointerEvents: "none" }}>
-      {Array.from({ length: count }, (_, i) => {
-        const x = seededRandom(i * 7 + 1) * 90 + 5;
-        const y = seededRandom(i * 13 + 2) * 85 + 5;
-        const size = 6 + seededRandom(i * 17 + 4) * 10;
+      <svg width={width} height={height} style={{ position: "absolute", inset: 0 }}>
+        <defs>
+          <radialGradient id="sparkle-glow">
+            <stop offset="0%" stopColor={color} stopOpacity={0.55} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </radialGradient>
+        </defs>
+        {Array.from({ length: count }, (_, i) => {
+          const x = seededRandom(i * 7 + 1) * 90 + 5;
+          const y = seededRandom(i * 13 + 2) * 85 + 5;
+          const size = 6 + seededRandom(i * 17 + 4) * 10;
 
-        const cycleLen = Math.round(fps * (1.2 + seededRandom(i * 23 + 8) * 2));
-        const offset = Math.round(seededRandom(i * 29 + 9) * durationInFrames);
-        const cycleFrame =
-          ((frame - offset) % cycleLen + cycleLen) % cycleLen;
+          const cycleLen = Math.round(fps * (1.2 + seededRandom(i * 23 + 8) * 2));
+          const offset = Math.round(seededRandom(i * 29 + 9) * durationInFrames);
+          const cycleFrame =
+            ((frame - offset) % cycleLen + cycleLen) % cycleLen;
 
-        const sparkleAlpha = interpolate(
-          cycleFrame,
-          [0, cycleLen * 0.15, cycleLen * 0.4, cycleLen],
-          [0, 1, 0.2, 0],
-          { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-        );
-        const sparkleScale = interpolate(
-          cycleFrame,
-          [0, cycleLen * 0.25, cycleLen],
-          [0.3, 1, 0.6],
-          { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-        );
+          const sparkleAlpha = interpolate(
+            cycleFrame,
+            [0, cycleLen * 0.15, cycleLen * 0.4, cycleLen],
+            [0, 1, 0.2, 0],
+            { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+          );
+          const sparkleScale = interpolate(
+            cycleFrame,
+            [0, cycleLen * 0.25, cycleLen],
+            [0.3, 1, 0.6],
+            { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+          );
+          const s = size * sparkleScale;
 
-        return (
-          <div
-            key={i}
-            style={{
-              position: "absolute",
-              left: `${x}%`,
-              top: `${y}%`,
-              width: size,
-              height: size,
-              opacity: sparkleAlpha * intensity,
-              transform: `scale(${sparkleScale}) rotate(45deg)`,
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                width: "100%",
-                height: 2,
-                top: "50%",
-                marginTop: -1,
-                backgroundColor: color,
-                borderRadius: 1,
-                boxShadow: `0 0 ${size * 0.8}px ${color}`,
-              }}
-            />
-            <div
-              style={{
-                position: "absolute",
-                width: 2,
-                height: "100%",
-                left: "50%",
-                marginLeft: -1,
-                backgroundColor: color,
-                borderRadius: 1,
-                boxShadow: `0 0 ${size * 0.8}px ${color}`,
-              }}
-            />
-          </div>
-        );
-      })}
+          return (
+            <g
+              key={i}
+              opacity={sparkleAlpha * intensity}
+              transform={`translate(${(x / 100) * width} ${(y / 100) * height}) rotate(45)`}
+            >
+              <circle r={s * 0.9} fill="url(#sparkle-glow)" />
+              <rect x={-s / 2} y={-1} width={s} height={2} rx={1} fill={color} />
+              <rect x={-1} y={-s / 2} width={2} height={s} rx={1} fill={color} />
+            </g>
+          );
+        })}
+      </svg>
     </AbsoluteFill>
   );
 };

@@ -30,6 +30,8 @@ import type { TerminalStep } from "./components/TerminalScene";
 import { ScreenshotScene } from "./components/ScreenshotScene";
 import type { ScreenshotStep } from "./components/ScreenshotScene";
 import { ProviderChip } from "./components/ProviderChip";
+import { StarfieldWarp } from "./components/StarfieldWarp";
+import { ChapterTitle3D } from "./components/ChapterTitle3D";
 import { resolveAsset } from "./lib/resolveAsset";
 import type { ParticleType } from "./components/ParticleOverlay";
 import { resolveTheme, type ThemeConfig, DEFAULT_THEME } from "./Root";
@@ -269,7 +271,7 @@ interface Cut {
 }
 
 interface Overlay {
-  type: "section_title" | "stat_reveal" | "hero_title" | "provider_chip";
+  type: "section_title" | "stat_reveal" | "hero_title" | "provider_chip" | "starfield_warp" | "chapter_title";
   in_seconds: number;
   out_seconds: number;
   text?: string;
@@ -760,6 +762,8 @@ const SceneRenderer: React.FC<{ cut: Cut; theme: ThemeConfig }> = ({ cut, theme 
         lightingFrom={cut.lightingFrom}
         lightingTo={cut.lightingTo}
         sceneDurationSeconds={cut.out_seconds - cut.in_seconds}
+        transitionIn={cut.transition_in}
+        transitionOut={cut.transition_out}
       />
     );
   }
@@ -836,6 +840,24 @@ const OverlayRenderer: React.FC<{ overlay: Overlay; theme: ThemeConfig }> = ({
       />
     );
   }
+  if (overlay.type === "starfield_warp") {
+    return (
+      <StarfieldWarp
+        seed={`warp-${overlay.in_seconds}`}
+        accentColor={overlay.accentColor || theme.accentColor}
+      />
+    );
+  }
+  if (overlay.type === "chapter_title") {
+    return (
+      <ChapterTitle3D
+        title={overlay.text ?? ""}
+        label={overlay.subtitle}
+        accentColor={overlay.accentColor || theme.accentColor}
+        textColor={theme.textColor}
+      />
+    );
+  }
   if (overlay.type === "provider_chip" && overlay.providers) {
     return (
       <ProviderChip
@@ -863,8 +885,9 @@ export const Explainer: React.FC<ExplainerProps> = (props) => {
 
   return (
     <AbsoluteFill style={{ background: theme.backgroundColor, fontFamily: theme.headingFont || fontFamily }}>
-      {/* Layer 0: Animated gradient background — driven by theme */}
-      <AnimatedBackground theme={theme} />
+      {/* Layer 0: Animated gradient background — driven by theme. flatBackground (jarvis branch): skip it when
+          full-screen media always cover it — its blurred orbs cost a lot per frame without a GPU */}
+      {props.flatBackground ? null : <AnimatedBackground theme={theme} />}
 
       {/* Layer 1: Visual scenes */}
       {cuts.map((cut) => {
